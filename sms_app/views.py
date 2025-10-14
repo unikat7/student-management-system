@@ -5,7 +5,9 @@ from .models import Student
 from django.contrib import messages
 from .models import User
 from django.contrib.auth import authenticate,login,logout
-
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.exceptions import AuthenticationFailed
 
 def RegisterView(request):
     if request.method=="POST":
@@ -25,6 +27,8 @@ def RegisterView(request):
         if role=='teacher':
             tt=Teacher.objects.create(user=user)
             tt.save()
+        
+
         messages.success(request,"successfully created the user")
         return redirect('register')
         
@@ -38,11 +42,54 @@ def loginView(request):
     if request.method=="POST":
         username=request.POST.get("username")
         password=request.POST.get("password")
-        role=request.POST.get("role")
-        user=request.user.authenticate(username=username,password=password,role=role)
+        role=request.POST.get("role").lower()
+        user=authenticate(username=username,password=password,role=role)
         if user is not None:
-            pass
+            refresh=RefreshToken.for_user(user)
+            refresh['role']=role
+            response=redirect("teacher")
+            response.set_cookie(
+                key='jwt',
+                value=str(refresh.access_token),
+                httponly=True,
+                samesite='Lax'
+            )
+            messages.success(request,"successfully login as {role}")
+            return response
+        else:
+            messages.error(request, "Invalid username or password")
+            return redirect('login')
+
     return render(request,"login.html")
+
+
+def studentdashboard(request):
+    token=request.COOKIES.get('jwt')
+    if not token:
+        return redirect('login')
+    auth=JWTAuthentication()
+    try:
+        validated_token = auth.get_validated_token(token)  
+        user = auth.get_user(validated_token)
+        request.user = user
+    except AuthenticationFailed:
+        return redirect('login')
+    return render(request,"studentdash.html")
+
+
+
+def teacherdashboard(request):
+    token=request.COOKIES.get('jwt')
+    if not token:
+        return redirect('login')
+    auth=JWTAuthentication()
+    try:
+        validated_token = auth.get_validated_token(token)  
+        user = auth.get_user(validated_token)
+        request.user = user
+    except AuthenticationFailed:
+        return redirect('login')
+    return render(request,"teacherdash.html")
 
 
 
