@@ -8,7 +8,7 @@ from django.contrib.auth import authenticate,login,logout
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import AuthenticationFailed
-
+from django.http import HttpResponse
 def RegisterView(request):
     if request.method=="POST":
         data=request.POST
@@ -27,13 +27,10 @@ def RegisterView(request):
         if role=='teacher':
             tt=Teacher.objects.create(user=user)
             tt.save()
-        
 
         messages.success(request,"successfully created the user")
         return redirect('register')
         
-
-
     return render(request,"register.html")
 
 
@@ -47,14 +44,14 @@ def loginView(request):
         if user is not None:
             refresh=RefreshToken.for_user(user)
             refresh['role']=role
-            response=redirect("teacher")
+            response=redirect(f"{role}")
             response.set_cookie(
                 key='jwt',
                 value=str(refresh.access_token),
                 httponly=True,
                 samesite='Lax'
             )
-            messages.success(request,"successfully login as {role}")
+            messages.success(request,f"successfully login as {role}")
             return response
         else:
             messages.error(request, "Invalid username or password")
@@ -74,7 +71,11 @@ def studentdashboard(request):
         request.user = user
     except AuthenticationFailed:
         return redirect('login')
-    return render(request,"studentdash.html")
+    if validated_token.get('role') != 'student':
+        return HttpResponse("Unauthorized: Only students allowed", status=403)
+    return render(request,"studentdash.html",{
+        "user":user
+    })
 
 
 
@@ -89,7 +90,12 @@ def teacherdashboard(request):
         request.user = user
     except AuthenticationFailed:
         return redirect('login')
-    return render(request,"teacherdash.html")
+    if validated_token.get('role') != 'teacher':
+        return HttpResponse("Unauthorized: Only students allowed", status=403)
+
+    return render(request,"teacherdash.html",{
+        "user":user
+    })
 
 
 
