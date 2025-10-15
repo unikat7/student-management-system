@@ -5,10 +5,13 @@ from .models import Student
 from django.contrib import messages
 from .models import User
 from django.contrib.auth import authenticate,login,logout
+
 from rest_framework_simplejwt.tokens import RefreshToken
+
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import AuthenticationFailed
 from django.http import HttpResponse
+
 def RegisterView(request):
     if request.method=="POST":
         data=request.POST
@@ -43,7 +46,14 @@ def loginView(request):
         user=authenticate(username=username,password=password,role=role)
         if user is not None:
             refresh=RefreshToken.for_user(user)
+            #creating a custom paylaod in the jwt 
+            '''
+            This means later, when someone sends this token (from the cookie), 
+            we  can read the role directly from the token without querying the database.
+            '''
             refresh['role']=role
+            
+
             response=redirect(f"{role}")
             response.set_cookie(
                 key='jwt',
@@ -91,12 +101,32 @@ def teacherdashboard(request):
     except AuthenticationFailed:
         return redirect('login')
     if validated_token.get('role') != 'teacher':
-        return HttpResponse("Unauthorized: Only students allowed", status=403)
+        return HttpResponse("Unauthorized: Only teacher allowed", status=403)
 
     return render(request,"teacherdash.html",{
         "user":user
     })
 
 
+def protected(request):
+    token=request.COOKIES.get('jwt')
+    if not token:
+        return redirect('login')
+    auth=JWTAuthentication()
+    try:
+        validated_token = auth.get_validated_token(token)  
+        user = auth.get_user(validated_token)
+        request.user = user
+    except AuthenticationFailed:
+        return redirect('login')
+
+    return render(request,"protected.html",{
+        "user":user
+    })
+
+
+
+def unika(request):
+    pass
 
 
